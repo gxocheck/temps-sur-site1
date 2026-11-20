@@ -159,6 +159,26 @@ table.plain th{cursor:default}
 .tbar{grid-column:2 / 4;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
 .tbar i{display:block;height:100%;background:var(--warn);border-radius:2px}
 .topc .none{margin:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px}
+.tabs button{background:transparent;border:1px solid var(--line);border-radius:999px;padding:8px 16px;font:inherit;color:var(--ink);cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--surface);font-weight:600}
+.tabpane{display:flex;flex-direction:column;gap:18px}
+[hidden]{display:none!important}
+.piegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.piec h3{font-family:var(--display);font-size:15px;margin:0 0 8px}
+.pie{display:flex;flex-direction:column;gap:10px;align-items:center}
+.pie svg{width:150px;height:150px;display:block}
+.pie ul{list-style:none;margin:0;padding:0;width:100%;display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.pie li{display:grid;grid-template-columns:14px 1fr auto;gap:8px;align-items:baseline}
+.pie li i{width:12px;height:12px;border-radius:3px;display:block;align-self:center}
+.pie li b{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.pie .none{color:var(--muted);font-size:13.5px;margin:0}
+table.arch td,table.arch th,table.stafft td,table.stafft th{text-align:left;white-space:normal}
+table.arch tbody tr{cursor:pointer}
+table.arch tbody tr:hover{background:var(--bg)}
+table.arch tr.cur td{font-weight:600;color:var(--accent)}
+table.stafft input[type=checkbox]{width:18px;height:18px;accent-color:var(--warn)}
+table.stafft tr.off td{color:var(--muted)}
 
 [hidden]{display:none!important}
 .gate{max-width:440px;margin:8vh auto 0;padding:0 16px}
@@ -223,7 +243,7 @@ table.plain th{cursor:default}
 
   <section class="card" id="admin" hidden>
     <h2>Comptes et droits</h2>
-    <p class="note" style="margin:6px 0 10px">Lecteur : consulte. Intégrateur : consulte et intègre les fichiers poste de garde et badgeuse, règle les horaires de shift. Seul l'administrateur retire ou rétablit un nom. « Taux visibles » ouvre le coût et l'import de la liste du personnel. Un compte « En attente » ne voit rien.</p>
+    <p class="note" style="margin:6px 0 10px">Lecteur : consulte. Intégrateur : consulte et intègre les fichiers poste de garde et badgeuse, règle les horaires de shift. « Taux visibles » ouvre l'affichage du coût. L'onglet Personnel, l'import de la liste et la neutralisation d'un nom sont réservés à l'administrateur. Un compte « En attente » ne voit rien.</p>
     <div class="tablebox"><table class="plain">
       <thead><tr><th>Compte</th><th>Rôle</th><th>Taux visibles</th></tr></thead>
       <tbody id="ub"></tbody>
@@ -232,6 +252,13 @@ table.plain th{cursor:default}
 
   <p class="note" id="readOnly" hidden style="margin:0">Compte en lecture : vous voyez l'analyse en direct, sans pouvoir intégrer de fichiers.</p>
 
+  <nav class="tabs" id="tabs" aria-label="Rubriques">
+    <button type="button" id="tabb-analyse" data-tab="analyse" aria-pressed="true">Analyse</button>
+    <button type="button" id="tabb-badgeuse" data-tab="badgeuse" aria-pressed="false">Badgeuse</button>
+    <button type="button" id="tabb-personnel" data-tab="personnel" aria-pressed="false">Personnel</button>
+  </nav>
+
+  <div class="tabpane" id="tab-analyse">
   <section class="card" id="imports">
     <div class="head-row"><h2>Fichiers à intégrer</h2><span class="count">Chaque intégration est partagée en direct</span></div>
     <div class="imp">
@@ -248,13 +275,6 @@ table.plain th{cursor:default}
         <label class="btn" for="tsFile">Ajouter un état badgeuse<input type="file" id="tsFile" accept=".xlsx,.xls" multiple></label>
         <span class="impinfo" id="tsLoaded"></span>
         <span class="fstatus" id="tsStatus" aria-live="polite"></span>
-      </div>
-      <div class="impc" id="staffCase">
-        <h3>Liste du personnel</h3>
-        <p>Extraction paie avec les taux horaires, en Excel ou CSV. Remplace la liste précédente.</p>
-        <label class="btn alt" for="staffFile">Remplacer la liste du personnel<input type="file" id="staffFile" accept=".xlsx,.xls,.csv,text/csv"></label>
-        <span class="impinfo" id="staffLoaded"></span>
-        <span class="fstatus" id="staffStatus" aria-live="polite"></span>
       </div>
     </div>
   </section>
@@ -302,6 +322,16 @@ table.plain th{cursor:default}
     <div class="topgrid" id="tops" aria-live="polite"></div>
   </section>
 
+  <section class="card" id="pies">
+    <div class="head-row"><h2>Répartition des anomalies</h2>
+      <select id="pieScope" aria-label="Périmètre du camembert badgeuse"><option value="day">Badgeuse : jour affiché</option><option value="all">Badgeuse : tous les jours archivés</option></select></div>
+    <div class="piegrid">
+      <div class="piec"><h3>Poste de garde : journées</h3><div id="pieDays"></div></div>
+      <div class="piec"><h3>Poste de garde : types d'anomalies</h3><div id="pieTypes"></div></div>
+      <div class="piec"><h3>Badgeuse : constats</h3><div id="pieTs"></div></div>
+    </div>
+  </section>
+
   <section class="card cost" id="cost">
     <h2>Coût des absences</h2>
     <div class="big" id="costTotal" aria-live="polite"></div>
@@ -335,6 +365,51 @@ table.plain th{cursor:default}
     </div>
   </section>
 
+  <section class="card">
+    <div class="head-row"><h2>Mois par mois</h2><span class="count">Touchez un mois pour n'afficher que lui</span></div>
+    <div class="tablebox"><table>
+      <thead><tr><th style="cursor:default">Mois</th><th style="cursor:default">Journées</th><th style="cursor:default">Entrées<br>tardives</th><th style="cursor:default">Sorties<br>anticipées</th><th style="cursor:default">Temps<br>sur site</th><th style="cursor:default">Écart<br>cumulé</th><th style="cursor:default">Sorties<br>courtes</th><th style="cursor:default">Coût</th></tr></thead>
+      <tbody id="mb"></tbody>
+    </table></div>
+  </section>
+
+  <section class="charts">
+    <div class="card chart"><h2>Entrée par rapport au début du shift</h2><p>Minutes avant (−) ou après (+) l'heure de début, par tranche de 5 min.</p><div id="chIn"></div></div>
+    <div class="card chart"><h2>Sortie par rapport à la fin du shift</h2><p>Minutes avant (−) ou après (+) l'heure de fin, par tranche de 5 min.</p><div id="chOut"></div></div>
+  </section>
+
+  <div class="legend"><span><i style="background:var(--bar)"></i>Dans la tolérance</span><span><i style="background:var(--warn)"></i>Hors tolérance</span></div>
+
+  <section class="card" id="people">
+    <div class="head-row"><h2>Par personne</h2><span class="count" id="count"></span></div>
+    <input type="search" id="q" placeholder="Rechercher un nom ou un service" aria-label="Rechercher un nom ou un service" autocomplete="off">
+    <p class="note" style="margin:0 0 8px">Touchez un en-tête pour trier, une ligne pour voir le détail, la croix, réservée à l'administrateur, pour retirer un nom de l'analyse.</p>
+    <div id="exbar" aria-live="polite"></div>
+    <div class="tablebox"><table id="tbl">
+      <thead><tr>
+        <th data-k="n" tabindex="0">Nom</th>
+        <th data-k="j" tabindex="0">Jours</th>
+        <th data-k="ein" tabindex="0">Entrée<br>moy.</th>
+        <th data-k="eout" tabindex="0">Sortie<br>moy.</th>
+        <th data-k="amp" tabindex="0">Temps<br>sur site</th>
+        <th data-k="late" tabindex="0">Entrées<br>tardives</th>
+        <th data-k="early" tabindex="0">Sorties<br>anticipées</th>
+        <th data-k="lost" tabindex="0">Écart<br>cumulé</th>
+        <th data-k="outs" tabindex="0">Sorties<br>courtes</th>
+        <th data-k="cost" tabindex="0">Coût</th>
+        <th class="act"><span style="position:absolute;left:-9999px">Retirer</span></th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table></div>
+  </section>
+
+  <section class="note">
+    <h2 style="color:var(--ink)">Lecture et périmètre</h2>
+    <ul id="notes"></ul>
+  </section>
+  </div>
+
+  <div class="tabpane" id="tab-badgeuse" hidden>
   <section class="card" id="ts">
     <div class="head-row"><h2>Badgeuse comparée au poste de garde</h2><span class="count" id="tsShown"></span></div>
     <p class="note" id="tsInfo" style="margin:6px 0 0"></p>
@@ -368,52 +443,37 @@ table.plain th{cursor:default}
     </table></div>
   </section>
 
-  <section class="card">
-    <div class="head-row"><h2>Mois par mois</h2><span class="count">Touchez un mois pour n'afficher que lui</span></div>
-    <div class="tablebox"><table>
-      <thead><tr><th style="cursor:default">Mois</th><th style="cursor:default">Journées</th><th style="cursor:default">Entrées<br>tardives</th><th style="cursor:default">Sorties<br>anticipées</th><th style="cursor:default">Temps<br>sur site</th><th style="cursor:default">Écart<br>cumulé</th><th style="cursor:default">Sorties<br>courtes</th><th style="cursor:default">Coût</th></tr></thead>
-      <tbody id="mb"></tbody>
+  <section class="card" id="arch">
+    <div class="head-row"><h2>Archive des pointages badgeuse</h2><span class="count" id="archCount"></span></div>
+    <p class="note" style="margin:0 0 8px">Chaque état intégré est conservé par jour. Touchez un jour pour l'afficher au-dessus.</p>
+    <div class="tablebox"><table class="plain arch">
+      <thead><tr><th>Jour</th><th>Personnes</th><th>Cohérents</th><th>Non pointés</th><th>Badgeages<br>incohérents</th><th>Incohérences<br>poste de garde</th><th>Dernière version</th></tr></thead>
+      <tbody id="archb"></tbody>
     </table></div>
   </section>
+  </div>
 
-  <section class="charts">
-    <div class="card chart"><h2>Entrée par rapport au début du shift</h2><p>Minutes avant (−) ou après (+) l'heure de début, par tranche de 5 min.</p><div id="chIn"></div></div>
-    <div class="card chart"><h2>Sortie par rapport à la fin du shift</h2><p>Minutes avant (−) ou après (+) l'heure de fin, par tranche de 5 min.</p><div id="chOut"></div></div>
-  </section>
-  <div class="legend"><span><i style="background:var(--bar)"></i>Dans la tolérance</span><span><i style="background:var(--warn)"></i>Hors tolérance</span></div>
-
-  <section class="card" id="people">
-    <div class="head-row"><h2>Par personne</h2><span class="count" id="count"></span></div>
-    <input type="search" id="q" placeholder="Rechercher un nom ou un service" aria-label="Rechercher un nom ou un service" autocomplete="off">
-    <p class="note" style="margin:0 0 8px">Touchez un en-tête pour trier, une ligne pour voir le détail, la croix, réservée à l'administrateur, pour retirer un nom de l'analyse.</p>
-    <div id="exbar" aria-live="polite"></div>
-    <div class="tablebox"><table id="tbl">
-      <thead><tr>
-        <th data-k="n" tabindex="0">Nom</th>
-        <th data-k="j" tabindex="0">Jours</th>
-        <th data-k="ein" tabindex="0">Entrée<br>moy.</th>
-        <th data-k="eout" tabindex="0">Sortie<br>moy.</th>
-        <th data-k="amp" tabindex="0">Temps<br>sur site</th>
-        <th data-k="late" tabindex="0">Entrées<br>tardives</th>
-        <th data-k="early" tabindex="0">Sorties<br>anticipées</th>
-        <th data-k="lost" tabindex="0">Écart<br>cumulé</th>
-        <th data-k="outs" tabindex="0">Sorties<br>courtes</th>
-        <th data-k="cost" tabindex="0">Coût</th>
-        <th class="act"><span style="position:absolute;left:-9999px">Retirer</span></th>
-      </tr></thead>
-      <tbody id="tb"></tbody>
+  <div class="tabpane" id="tab-personnel" hidden>
+  <section class="card" id="staffTab">
+    <div class="head-row"><h2>Liste du personnel</h2><span class="count" id="staffCount"></span></div>
+    <p class="note" id="staffInfo" style="margin:0 0 10px"></p>
+    <div class="imp" style="margin-bottom:12px">
+      <div class="impc" id="staffCase">
+        <h3>Liste du personnel</h3>
+        <p>Extraction paie avec les taux horaires, en Excel ou CSV. Remplace la liste précédente.</p>
+        <label class="btn alt" for="staffFile">Remplacer la liste du personnel<input type="file" id="staffFile" accept=".xlsx,.xls,.csv,text/csv"></label>
+        <span class="impinfo" id="staffLoaded"></span>
+        <span class="fstatus" id="staffStatus" aria-live="polite"></span>
+      </div>
+    </div>
+    <input type="search" id="sq" placeholder="Rechercher dans la liste du personnel" aria-label="Rechercher dans la liste du personnel" autocomplete="off">
+    <p class="note" style="margin:0 0 8px">Cochez « Neutralisé » pour sortir une personne de toutes les analyses, pour tous les comptes.</p>
+    <div class="tablebox"><table class="plain stafft">
+      <thead><tr><th>Nom</th><th>Contrat</th><th>Emploi</th><th>Taux horaire</th><th>Nom au poste de garde</th><th>Neutralisé</th></tr></thead>
+      <tbody id="stb"></tbody>
     </table></div>
   </section>
-
-  <section class="card">
-    <h2>Liste du personnel</h2>
-    <p class="note" id="staffInfo" style="margin:6px 0 0"></p>
-  </section>
-
-  <section class="note">
-    <h2 style="color:var(--ink)">Lecture et périmètre</h2>
-    <ul id="notes"></ul>
-  </section>
+  </div>
 </div>
 <script src="firebase-config.js"></script>
 <script src="firebase-bundle.js"></script>
@@ -421,8 +481,9 @@ table.plain th{cursor:default}
 <script>
 var BASE_ID="live";
 var RAW={names:[],rows:[]}, STAFF=null, TS={}, BASE=null, MODEL=null;
-var state={tin:5,tout:5,sh:"",svc:"",month:"",q:"",sort:"cost",dir:-1,open:"",ex:{},cGap:true,cOut:true,coef:1,tInt:0,gMin:3,gMax:60,tsDate:"",tsType:"",tsCount:"",tsTol:5,topN:5,gFree:20};
-var CANCOST=true, CANEX=true;
+var state={tin:5,tout:5,sh:"",svc:"",month:"",q:"",sort:"cost",dir:-1,open:"",ex:{},cGap:true,cOut:true,coef:1,tInt:0,gMin:3,gMax:60,tsDate:"",tsType:"",tsCount:"",tsTol:5,topN:5,gFree:20,tab:"analyse",sq:"",pieScope:"day"};
+var CANCOST=true, CANEX=true, ISADMIN=true;
+var PIEC=["#3b82c4","#e08a2c","#c8443a","#2f9e8f","#8e6bbf","#8b98a5"];
 var EXKEY="temps-sur-site-noms-retires", DKEY="temps-sur-site-donnees", SKEY="temps-sur-site-shifts";
 var SHK=["M","A","N"],SHN={M:"Matin",A:"Après-midi",N:"Nuit"},JOURS=["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
 function defShifts(){var w=function(a,b,n){var o=[];for(var i=0;i<7;i++)o.push(i<n?[a,b]:null);return o};return {M:w(360,780,7),A:w(780,1200,7),N:w(1200,300,4)}}
@@ -638,13 +699,14 @@ function build(raw,staff,ts,cfg){cfg=cfg||defShifts();
     else{var ds=dstr(L.day);days.push([L.p,ds,L.sh,L.eo,L.so,L.amp,L.gaps,L.a,L.b]);months[ds.slice(0,7)]=1;if(!dmin)dmin=ds;dmax=ds}}
   counts.jours=days.length;
   people.forEach(function(p,j){p.on=isP[j]});
+  var staffRows=null;if(staff){var inv={};for(var gn in sm0.map)inv[sm0.map[gn]]=gn;staffRows=staff.list.map(function(x,j){return {nom:x.nom,prenom:x.prenom,ct:x.ct,job:x.job,t:x.t,g:inv[j]||null}})}
   var st=null;if(staff){st={n:staff.list.length,found:staff.list.length-sm0.missing.length,missing:sm0.missing.map(function(j){return staff.list[j].nom+" "+staff.list[j].prenom}),hors:Object.keys(hors).length,src:staff.src||""}}
   counts.int=people.filter(function(p){return p.on&&p.int}).length;counts.filt=filt;
-  return {people:people,days:days,counts:counts,staff:st,pass:pass,gFrom:gFrom,gTo:gTo,tsMap:tsMap,months:Object.keys(months).sort(),from:dmin,to:dmax,dropped:dropLast?dstr(lastDay):null};
+  return {people:people,days:days,counts:counts,staff:st,staffRows:staffRows,pass:pass,gFrom:gFrom,gTo:gTo,tsMap:tsMap,months:Object.keys(months).sort(),from:dmin,to:dmax,dropped:dropLast?dstr(lastDay):null};
 }
 
 /* ---------- indicateurs ---------- */
-function blank(){return {j:0,late:0,early:0,lost:0,amp:0,outs:0,outMin:0,cmin:0,cost:0,theo:0}}
+function blank(){return {j:0,late:0,early:0,lost:0,amp:0,outs:0,outMin:0,cmin:0,cost:0,theo:0,outDays:0,anyDays:0}}
 function compute(days,people,st){
   var per={},tot=blank(),hin={},hout={},byM={},byS={},ex=st.ex||{},coef=st.coef||1,noRate={},allG=[],gMin=st.gMin===undefined?3:st.gMin,gMax=st.gMax===undefined?60:st.gMax,gFree=st.gFree||0;tot.freeN=0;tot.freeMin=0;
   for(var i=0;i<days.length;i++){
@@ -664,6 +726,7 @@ function compute(days,people,st){
     var S=byS[P.s]||(byS[P.s]={s:P.s,who:{},cmin:0,cost:0});S.who[P.n]=1;S.cmin+=cmin;S.cost+=cost;
     p.j++;p.ein+=d[3];p.eout+=d[4];p.amp+=d[5];if(late)p.late++;if(early)p.early++;p.lost+=lost;p.outs+=g.length;p.outMin+=gm;
     if(late||early)p.flag.push(d);if(g.length)p.out.push([d[1],g]);
+    if(g.length)tot.outDays++;if(late||early||g.length)tot.anyDays++;
     tot.j++;tot.theo+=(d[8]||0)-(d[7]||0);tot.amp+=d[5];if(late)tot.late++;if(early)tot.early++;tot.lost+=lost;tot.outs+=g.length;tot.outMin+=gm;
     var bi=Math.max(-60,Math.min(55,Math.floor(d[3]/5)*5)), bo=Math.max(-60,Math.min(55,Math.floor(d[4]/5)*5));
     var a=hin[bi]||(hin[bi]=[0,0]); a[late?1:0]++; var b=hout[bo]||(hout[bo]=[0,0]); b[early?1:0]++;
@@ -749,6 +812,9 @@ function render(){
 
   renderTs();
   renderTops(r);
+  renderPies(r);
+  renderStaff();
+  applyTabs();
 
   hist($("chIn"),r.hin,state.tin,"in"); hist($("chOut"),r.hout,state.tout,"out");
 
@@ -790,6 +856,38 @@ function render(){
   ].filter(Boolean).map(function(x){return "<li>"+x+"</li>"}).join("");
 }
 
+function tsClass(w){var has=function(k){return w.fl.some(function(f){return f[0]===k})};
+  return has("nb")?1:has("np")?2:(has("ss")||has("hs")||has("ab"))?3:(w.abs.length||w.forfait)?4:w.cov?0:5}
+function pie(el,slices){
+  var tot=0;slices.forEach(function(s){tot+=s[1]});
+  if(!tot){el.innerHTML='<p class="none">Aucune donnée avec ces filtres.</p>';return}
+  var a0=-Math.PI/2,R=70,r=38,svg='<svg viewBox="0 0 150 150" role="img" aria-label="Camembert">',pt=function(a,rad){return (75+rad*Math.cos(a)).toFixed(2)+" "+(75+rad*Math.sin(a)).toFixed(2)};
+  slices.forEach(function(s){if(!s[1])return;var fr=s[1]/tot,a1=a0+fr*2*Math.PI;
+    if(fr>0.9999)svg+='<circle cx="75" cy="75" r="'+((R+r)/2)+'" fill="none" stroke="'+s[2]+'" stroke-width="'+(R-r)+'"/>';
+    else{var lg=fr>0.5?1:0;svg+='<path d="M'+pt(a0,R)+' A'+R+' '+R+' 0 '+lg+' 1 '+pt(a1,R)+' L'+pt(a1,r)+' A'+r+' '+r+' 0 '+lg+' 0 '+pt(a0,r)+' Z" fill="'+s[2]+'" stroke="var(--surface)" stroke-width="1.5"/>'}
+    a0=a1});
+  svg+='<text x="75" y="72" text-anchor="middle" font-size="20" font-weight="700" fill="var(--ink)">'+tot.toLocaleString("fr-FR")+'</text><text x="75" y="88" text-anchor="middle" font-size="9.5" fill="var(--muted)">au total</text></svg>';
+  el.innerHTML='<div class="pie">'+svg+'<ul>'+slices.map(function(s){return '<li><i style="background:'+s[2]+'"></i><span>'+s[0]+'</span><b>'+s[1].toLocaleString("fr-FR")+' · '+pct(s[1],tot)+'</b></li>'}).join("")+'</ul></div>'}
+function renderPies(r){
+  var t=r.tot;
+  pie($("pieDays"),[["Journées sans anomalie",t.j-t.anyDays,PIEC[3]],["Journées avec anomalie",t.anyDays,PIEC[2]]]);
+  pie($("pieTypes"),[["Entrées tardives",t.late,PIEC[0]],["Sorties anticipées",t.early,PIEC[1]],["Journées avec sortie courte",t.outDays,PIEC[4]]]);
+  var X=crossTs(TS,MODEL,state),c=[0,0,0,0,0,0],ds=state.pieScope==="all"?Object.keys(X):(X[state.tsDate]?[state.tsDate]:[]);
+  ds.forEach(function(d){X[d].rows.forEach(function(w){c[tsClass(w)]++})});
+  pie($("pieTs"),[["Cohérent",c[0],PIEC[3]],["Non pointé",c[2],PIEC[2]],["Badgeages incohérents",c[1],PIEC[1]],["Incohérence poste de garde",c[3],PIEC[4]],["Absence ou forfait",c[4],PIEC[0]],["Non comparé",c[5],PIEC[5]]].filter(function(s,i){return i<5||s[1]}));
+}
+function renderStaff(){
+  if(!ISADMIN){$("stb").innerHTML="";$("staffCount").textContent="";$("staffInfo").textContent="";return}
+  var rows=MODEL.staffRows||[],toks=fold(state.sq).split(/\s+/).filter(Boolean),off=0;
+  rows.forEach(function(x){if(x.g&&state.ex[x.g])off++});
+  var L=rows.filter(function(x){var hay=fold(x.nom+" "+x.prenom+" "+x.ct+" "+x.job+" "+(x.g||""));return toks.every(function(k){return hay.indexOf(k)>=0})});
+  $("staffCount").textContent=rows.length?L.length+(L.length!==rows.length?" sur "+rows.length:"")+" personnes · "+off+" neutralisée"+(off>1?"s":""):"";
+  $("stb").innerHTML=L.length?L.map(function(x){var o=x.g&&state.ex[x.g];
+    return '<tr class="'+(o?"off":"")+'"><td>'+esc(x.nom+" "+x.prenom)+'</td><td>'+esc(x.ct||"—")+'</td><td>'+esc(x.job||"—")+'</td><td>'+(x.t?eur2(x.t):"—")+'</td><td>'+(x.g?esc(x.g):"Non retrouvé")+'</td><td>'+(x.g?'<input type="checkbox" data-g="'+esc(x.g)+'" aria-label="Neutraliser '+esc(x.nom+" "+x.prenom)+'"'+(o?" checked":"")+'>':"—")+'</td></tr>'}).join(""):'<tr><td colspan="6">'+(rows.length?"Aucune personne ne correspond à cette recherche.":"Aucune liste du personnel chargée.")+'</td></tr>'}
+function applyTabs(){
+  if(state.tab==="personnel"&&!ISADMIN)state.tab="analyse";
+  $("tabb-personnel").hidden=!ISADMIN;
+  ["analyse","badgeuse","personnel"].forEach(function(t){$("tab-"+t).hidden=state.tab!==t;$("tabb-"+t).setAttribute("aria-pressed",state.tab===t?"true":"false")})}
 function renderTops(r){
   var N=state.topN,cards=[],X=crossTs(TS,MODEL,state),tsC={};
   Object.keys(X).forEach(function(d){X[d].rows.forEach(function(w){var o=tsC[w.n]||(tsC[w.n]={n:w.n,np:0,nb:0,inc:0});w.fl.forEach(function(f){if(f[0]==="np")o.np++;else if(f[0]==="nb")o.nb++;else o.inc++})})});
@@ -815,7 +913,7 @@ function renderTs(){
   if(dates.indexOf(state.tsDate)<0)state.tsDate=dates.length?dates[dates.length-1]:"";
   $("tsDate").innerHTML=dates.length?dates.map(function(d){return '<option value="'+d+'"'+(d===state.tsDate?" selected":"")+'>'+dlong(d)+'</option>'}).join(""):'<option value="">Aucun état intégré</option>';
   var cur=X[state.tsDate];
-  if(!cur){$("tsTiles").innerHTML="";$("tsShown").textContent="";$("tsLoaded").textContent="Aucun état intégré.";$("tsb").innerHTML='<tr><td colspan="5">Ajoutez un état journalier des heures pour le croiser avec le poste de garde.</td></tr>';$("tsInfo").textContent="";return}
+  if(!cur){$("archb").innerHTML='<tr><td colspan="7">Aucun état archivé.</td></tr>';$("archCount").textContent="";$("tsTiles").innerHTML="";$("tsShown").textContent="";$("tsLoaded").textContent="Aucun état intégré.";$("tsb").innerHTML='<tr><td colspan="5">Ajoutez un état journalier des heures pour le croiser avec le poste de garde.</td></tr>';$("tsInfo").textContent="";return}
   var has=function(w,k){return w.fl.some(function(f){return f[0]===k})},cnt=function(k){return cur.rows.filter(function(w){return has(w,k)}).length};
   var cross=cur.rows.filter(function(w){return has(w,"ss")||has(w,"hs")||has(w,"ab")}).length,okN=cur.rows.filter(function(w){return (w.nb===2||w.nb===4)&&!w.fl.length}).length;
   $("tsTiles").innerHTML=[["Personnes dans l'état",cur.rows.length,0],["Badgées et cohérentes",okN,0],["Non pointées",cnt("np"),1],["Badgeages incohérents",cnt("nb"),1],["Incohérences avec le poste de garde",cur.covered?cross:"—",1]].map(function(x){return '<div class="tile'+(x[2]&&x[1]>0?" alert":"")+'"><div class="k">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>'}).join("");
@@ -824,6 +922,10 @@ function renderTs(){
   var ty=state.tsType,tc=state.tsCount,rows=cur.rows.filter(function(w){return (ty==="all"?true:ty?has(w,ty):w.fl.length>0)&&(tc===""?true:tc==="x"?(w.nb!==0&&w.nb!==2&&w.nb!==4):tc==="5"?w.nb>=5:w.nb===+tc)});
   $("tsShown").textContent=rows.length+" ligne"+(rows.length>1?"s":"")+" sur "+cur.rows.length;
   $("tsb").innerHTML=rows.length?rows.map(function(w){return '<tr><td>'+esc(w.n)+(w.int?' <span class="tag">INT</span>':'')+'<span class="svc">'+esc(w.m)+(w.p?" · "+esc(w.p):"")+'</span></td><td>'+w.nb+'</td><td>'+(esc(w.raw)||"—")+'</td><td>'+(esc(w.site)||(w.gate?"—":"nom inconnu"))+'</td><td class="an">'+(w.fl.length?w.fl.map(function(f){return '<span class="flag">'+TSLAB[f[0]]+'</span>'+(f[1]?'<span class="fd">'+esc(f[1])+'</span>':"")}).join(""):(w.abs.length?"Absence : "+esc(w.abs.join(", ")):w.forfait?"Forfait, sans badgeage":w.cov?'<span class="okc">Cohérent avec le poste de garde</span>':"Non comparé au poste de garde"))+'</td></tr>'}).join(""):'<tr><td colspan="5">Aucune ligne pour ce filtre.</td></tr>';
+  var has2=function(w,k){return w.fl.some(function(f){return f[0]===k})},ad=Object.keys(X).sort().reverse();
+  $("archCount").textContent=ad.length+" jour"+(ad.length>1?"s":"")+" archivé"+(ad.length>1?"s":"");
+  $("archb").innerHTML=ad.map(function(d){var rw=X[d].rows,n=function(f){return rw.filter(f).length},stp=Math.max.apply(null,Object.keys(TS[d]).map(function(k){return TS[d][k].st||0}));
+    return '<tr class="'+(d===state.tsDate?"cur":"")+'" data-d="'+d+'" tabindex="0"><td>'+dlong(d)+'</td><td>'+rw.length+'</td><td>'+n(function(w){return tsClass(w)===0})+'</td><td>'+n(function(w){return has2(w,"np")})+'</td><td>'+n(function(w){return has2(w,"nb")})+'</td><td>'+(X[d].covered?n(function(w){return has2(w,"ss")||has2(w,"hs")||has2(w,"ab")}):"—")+'</td><td>'+(stp?new Date(stp*60000).toISOString().slice(0,16).replace("T"," à ").replace(/^(\d{4})-(\d{2})-(\d{2})/,"$3/$2/$1"):"—")+'</td></tr>'}).join("");
   var dl=Object.keys(TS).sort();$("tsLoaded").textContent=dl.length?dl.length+" jour"+(dl.length>1?"s":"")+" intégré"+(dl.length>1?"s":"")+" : "+dl.map(function(x){return dfr(x)}).join(", ")+".":"Aucun état intégré.";
 }
 function loadShifts(){try{var s=JSON.parse(localStorage.getItem(SKEY)||"null");if(s&&s.M&&s.A&&s.N){SHIFTS=s;SHIFTSAT=+localStorage.getItem(SKEY+"-at")||0}}catch(e){}}
@@ -877,7 +979,7 @@ function init(){
   var numIn=function(id,key,lo,hi,def,full){$(id).addEventListener("input",function(e){var v=num(e.target.value);state[key]=v===null?def:Math.max(lo,Math.min(hi,v));if(full)render();else renderTs()})};
   numIn("gMax","gMax",1,240,60,true);numIn("gMin","gMin",0,60,3,true);numIn("tInt","tInt",0,200,0,true);numIn("gFree","gFree",0,240,0,true);numIn("tsTol","tsTol",0,60,5,false);
   $("tsCount").addEventListener("change",function(e){state.tsCount=e.target.value;if(state.tsCount!==""&&state.tsType===""){state.tsType="all";$("tsType").value="all"}renderTs()});
-  $("tsDate").addEventListener("change",function(e){state.tsDate=e.target.value;renderTs()});
+  $("tsDate").addEventListener("change",function(e){state.tsDate=e.target.value;render()});
   $("tsType").addEventListener("change",function(e){state.tsType=e.target.value;renderTs()});
   $("tsFile").addEventListener("change",function(e){
     var files=[].slice.call(e.target.files||[]),st=$("tsStatus"),msgs=[],bad=false,i=0;if(!files.length)return;
@@ -909,7 +1011,14 @@ function init(){
   $("tops").addEventListener("click",function(e){var b=e.target.closest("button.toprow");if(!b)return;
     if(b.dataset.who){state.q=b.dataset.who;$("q").value=state.q;state.open=state.q;render();$("people").scrollIntoView({behavior:"smooth",block:"start"})}
     else if(b.dataset.svc){state.svc=b.dataset.svc;$("svc").value=state.svc;state.open="";render()}
-    else if(b.dataset.ts!==undefined){state.tsType=b.dataset.ts;$("tsType").value=state.tsType;state.tsCount="";$("tsCount").value="";renderTs();$("ts").scrollIntoView({behavior:"smooth",block:"start"})}});
+    else if(b.dataset.ts!==undefined){state.tab="badgeuse";applyTabs();state.tsType=b.dataset.ts;$("tsType").value=state.tsType;state.tsCount="";$("tsCount").value="";renderTs();$("ts").scrollIntoView({behavior:"smooth",block:"start"})}});
+  $("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b||!b.dataset.tab)return;state.tab=b.dataset.tab;applyTabs()});
+  $("pieScope").addEventListener("change",function(e){state.pieScope=e.target.value;render()});
+  $("sq").addEventListener("input",function(e){state.sq=e.target.value;renderStaff()});
+  $("stb").addEventListener("change",function(e){var g=e.target.dataset.g;if(!g||!CANEX)return;if(e.target.checked)state.ex[g]=1;else delete state.ex[g];saveEx();render()});
+  var pickD=function(tr){if(!tr||!tr.dataset.d)return;state.tsDate=tr.dataset.d;render();$("ts").scrollIntoView({behavior:"smooth",block:"start"})};
+  $("archb").addEventListener("click",function(e){pickD(e.target.closest("tr"))});
+  $("archb").addEventListener("keydown",function(e){if(e.key==="Enter")pickD(e.target.closest("tr"))});
   $("cGap").addEventListener("change",function(e){state.cGap=e.target.checked;render()});
   $("cOut").addEventListener("change",function(e){state.cOut=e.target.checked;render()});
   $("coef").addEventListener("input",function(e){var v=num(e.target.value);state.coef=v&&v>0?v:1;render()});
@@ -1022,7 +1131,7 @@ function startData(){
 function stopData(){LIVE.offs.forEach(function(f){try{f()}catch(e){}});LIVE.offs=[];LIVE.started=false;if(LIVE.adminOff){try{LIVE.adminOff()}catch(e){}LIVE.adminOff=null}}
 function applyRole(){
   $("who").textContent=(LIVE.user.email||"")+" · "+(ROLES[LIVE.role]||LIVE.role)+(LIVE.taux?" · taux visibles":"");
-  $("imports").hidden=!canWrite();$("staffCase").hidden=!LIVE.taux;
+  $("imports").hidden=!canWrite();applyTabs();
   $("readOnly").hidden=canWrite();
   $("adminBtn").hidden=LIVE.role!=="admin";if(LIVE.role!=="admin")$("admin").hidden=true;
   [].forEach.call(document.querySelectorAll("#shb input,#shCopy,#shReset"),function(x){x.disabled=!canWrite()});
@@ -1053,7 +1162,7 @@ function liveBoot(){
     showScreen("loading");
     LIVE.userOff=FB.onValue(R("users/"+u.uid),function(s){var v=s.val();
       if(!v){FB.set(R("users/"+u.uid),{email:u.email||"",role:"attente",taux:false,at:Date.now()}).catch(function(e){showScreen("wait");$("waitMsg").textContent="Votre compte n'a pas pu être enregistré ("+String(e&&(e.code||e.message)||e)+"). Prévenez l'administrateur."});return}
-      var role=v.role,taux=v.taux===true||role==="admin",changed=role!==LIVE.role||taux!==LIVE.taux;LIVE.role=role;LIVE.taux=taux;CANCOST=taux;CANEX=role==="admin";
+      var role=v.role,taux=v.taux===true||role==="admin",changed=role!==LIVE.role||taux!==LIVE.taux;LIVE.role=role;LIVE.taux=taux;CANCOST=taux;CANEX=ISADMIN=role==="admin";
       if(!isMember()){stopData();showScreen("wait");$("waitMsg").textContent="Compte "+(u.email||"")+" créé. Un administrateur doit maintenant vous donner un accès ; cette page s'ouvrira d'elle-même dès que ce sera fait.";return}
       ["setup","login","wait"].forEach(function(x){$(x).hidden=true});
       if(changed||!LIVE.started)startData()},
