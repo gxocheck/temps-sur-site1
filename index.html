@@ -223,7 +223,7 @@ table.plain th{cursor:default}
 
   <section class="card" id="admin" hidden>
     <h2>Comptes et droits</h2>
-    <p class="note" style="margin:6px 0 10px">Lecteur : consulte. Intégrateur : consulte et intègre les fichiers poste de garde et badgeuse, règle les horaires de shift. « Taux visibles » ouvre le coût et l'import de la liste du personnel. Un compte « En attente » ne voit rien.</p>
+    <p class="note" style="margin:6px 0 10px">Lecteur : consulte. Intégrateur : consulte et intègre les fichiers poste de garde et badgeuse, règle les horaires de shift. Seul l'administrateur retire ou rétablit un nom. « Taux visibles » ouvre le coût et l'import de la liste du personnel. Un compte « En attente » ne voit rien.</p>
     <div class="tablebox"><table class="plain">
       <thead><tr><th>Compte</th><th>Rôle</th><th>Taux visibles</th></tr></thead>
       <tbody id="ub"></tbody>
@@ -309,6 +309,7 @@ table.plain th{cursor:default}
     <div class="opts">
       <label for="cGap"><input type="checkbox" id="cGap" checked> Retards et départs hors tolérance</label>
       <label for="cOut"><input type="checkbox" id="cOut" checked> Sorties de site de moins d'1h</label>
+      <label for="gFree">Sorties non valorisées sous <input type="number" id="gFree" min="0" max="240" step="1" value="20" inputmode="numeric"> min</label>
       <label for="tInt">Taux horaire intérimaires <input type="number" id="tInt" min="0" max="200" step="0.5" placeholder="€/h" inputmode="decimal"></label>
       <label for="coef">Coefficient de charges <input type="number" id="coef" min="1" max="3" step="0.05" value="1" inputmode="decimal"></label>
     </div>
@@ -384,7 +385,7 @@ table.plain th{cursor:default}
   <section class="card" id="people">
     <div class="head-row"><h2>Par personne</h2><span class="count" id="count"></span></div>
     <input type="search" id="q" placeholder="Rechercher un nom ou un service" aria-label="Rechercher un nom ou un service" autocomplete="off">
-    <p class="note" style="margin:0 0 8px">Touchez un en-tête pour trier, une ligne pour voir le détail, la croix pour retirer un nom de l'analyse.</p>
+    <p class="note" style="margin:0 0 8px">Touchez un en-tête pour trier, une ligne pour voir le détail, la croix, réservée à l'administrateur, pour retirer un nom de l'analyse.</p>
     <div id="exbar" aria-live="polite"></div>
     <div class="tablebox"><table id="tbl">
       <thead><tr>
@@ -420,8 +421,8 @@ table.plain th{cursor:default}
 <script>
 var BASE_ID="live";
 var RAW={names:[],rows:[]}, STAFF=null, TS={}, BASE=null, MODEL=null;
-var state={tin:5,tout:5,sh:"",svc:"",month:"",q:"",sort:"cost",dir:-1,open:"",ex:{},cGap:true,cOut:true,coef:1,tInt:0,gMin:3,gMax:60,tsDate:"",tsType:"",tsCount:"",tsTol:5,topN:5};
-var CANCOST=true;
+var state={tin:5,tout:5,sh:"",svc:"",month:"",q:"",sort:"cost",dir:-1,open:"",ex:{},cGap:true,cOut:true,coef:1,tInt:0,gMin:3,gMax:60,tsDate:"",tsType:"",tsCount:"",tsTol:5,topN:5,gFree:20};
+var CANCOST=true, CANEX=true;
 var EXKEY="temps-sur-site-noms-retires", DKEY="temps-sur-site-donnees", SKEY="temps-sur-site-shifts";
 var SHK=["M","A","N"],SHN={M:"Matin",A:"Après-midi",N:"Nuit"},JOURS=["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
 function defShifts(){var w=function(a,b,n){var o=[];for(var i=0;i<7;i++)o.push(i<n?[a,b]:null);return o};return {M:w(360,780,7),A:w(780,1200,7),N:w(1200,300,4)}}
@@ -645,16 +646,18 @@ function build(raw,staff,ts,cfg){cfg=cfg||defShifts();
 /* ---------- indicateurs ---------- */
 function blank(){return {j:0,late:0,early:0,lost:0,amp:0,outs:0,outMin:0,cmin:0,cost:0,theo:0}}
 function compute(days,people,st){
-  var per={},tot=blank(),hin={},hout={},byM={},byS={},ex=st.ex||{},coef=st.coef||1,noRate={},allG=[],gMin=st.gMin===undefined?3:st.gMin,gMax=st.gMax===undefined?60:st.gMax;
+  var per={},tot=blank(),hin={},hout={},byM={},byS={},ex=st.ex||{},coef=st.coef||1,noRate={},allG=[],gMin=st.gMin===undefined?3:st.gMin,gMax=st.gMax===undefined?60:st.gMax,gFree=st.gFree||0;tot.freeN=0;tot.freeMin=0;
   for(var i=0;i<days.length;i++){
     var d=days[i],P=people[d[0]]; if(ex[P.n])continue; if(st.sh&&d[2]!==st.sh)continue; if(st.svc&&P.s!==st.svc)continue;
     var late=d[3]>st.tin, early=d[4]<-st.tout, lost=(late?d[3]-Math.min(0,st.tin):0)+(early?-d[4]-Math.min(0,st.tout):0),g0=d[6]||[],g=[],gm=0,k;
-    for(k=0;k<g0.length;k++)if(g0[k][1]>=gMin&&g0[k][1]<gMax){g.push(g0[k]);gm+=g0[k][1]}
-    var rate=P.t||(P.int?st.tInt||0:0),cmin=(st.cGap?lost:0)+(st.cOut?gm:0),cost=rate?cmin/60*rate*coef:0;
+    var gc=0;
+    for(k=0;k<g0.length;k++)if(g0[k][1]>=gMin&&g0[k][1]<gMax){g.push(g0[k]);gm+=g0[k][1];if(g0[k][1]>=gFree)gc+=g0[k][1]}
+    var rate=P.t||(P.int?st.tInt||0:0),cmin=(st.cGap?lost:0)+(st.cOut?gc:0),cost=rate?cmin/60*rate*coef:0;
     var mo=d[1].slice(0,7),M=byM[mo]||(byM[mo]=blank());
     M.cmin+=cmin;M.cost+=cost;
     M.j++;M.amp+=d[5];if(late)M.late++;if(early)M.early++;M.lost+=lost;M.outs+=g.length;M.outMin+=gm;
     if(st.month&&mo!==st.month)continue;
+    if(st.cOut)for(k=0;k<g.length;k++)if(g[k][1]<gFree){tot.freeN++;tot.freeMin+=g[k][1]}
     var p=per[d[0]]||(per[d[0]]={i:d[0],n:P.n,s:P.s,j:0,ein:0,eout:0,amp:0,late:0,early:0,lost:0,outs:0,outMin:0,cmin:0,cost:0,t:rate,ct:P.ct,job:P.job,int:P.int,flag:[],out:[]});
     for(k=0;k<g0.length;k++)allG.push([g0[k][1],g0[k][0],d[2]]);
     p.cmin+=cmin;p.cost+=cost;tot.cmin+=cmin;tot.cost+=cost;if(cmin&&!rate)noRate[P.n]=1;
@@ -716,7 +719,7 @@ function render(){
 
   var svcRows=r.byS.sort(function(a,b){return b.cost-a.cost||b.cmin-a.cmin});
   $("costTotal").textContent=!CANCOST?"Réservé":c.filt?eur(t.cost):"—";
-  $("costSub").textContent=!CANCOST?dur(t.cmin)+" d'absence. Le chiffrage est réservé aux comptes habilités à voir les taux horaires.":c.filt?dur(t.cmin)+" d'absence valorisées"+(state.coef!==1?", charges comprises (× "+String(state.coef).replace(".",",")+")":", au taux horaire brut"):"Ajoutez la liste du personnel pour chiffrer les absences.";
+  $("costSub").textContent=!CANCOST?dur(t.cmin)+" d'absence. Le chiffrage est réservé aux comptes habilités à voir les taux horaires.":c.filt?dur(t.cmin)+" d'absence valorisées"+(state.coef!==1?", charges comprises (× "+String(state.coef).replace(".",",")+")":", au taux horaire brut")+(t.freeN?". "+t.freeN+" sortie"+(t.freeN>1?"s":"")+" de moins de "+state.gFree+" min non valorisée"+(t.freeN>1?"s":"")+" ("+dur(t.freeMin)+")":""):"Ajoutez la liste du personnel pour chiffrer les absences.";
   var isInt={};m.people.forEach(function(p){if(p.int)isInt[p.n]=1});var nrI=r.noRate.filter(function(n){return isInt[n]}),nrO=r.noRate.filter(function(n){return !isInt[n]});
   $("costWarn").textContent=!CANCOST?"":(nrI.length?nrI.length+" intérimaire"+(nrI.length>1?"s":"")+" avec absences mais sans taux : saisissez un taux horaire intérimaire pour les chiffrer. ":"")+(nrO.length?"Taux horaire manquant pour "+nrO.join(", ")+".":"");
   $("sb").innerHTML=svcRows.length?svcRows.map(function(s){return '<tr><td>'+esc(s.s)+'</td><td>'+s.n+'</td><td>'+(s.cmin?dur(s.cmin):"—")+'</td><td>'+(s.cost?eur(s.cost):"—")+'</td></tr>'}).join(""):'<tr><td colspan="4">Aucune journée avec ces filtres.</td></tr>';
@@ -759,7 +762,7 @@ function render(){
   var pill=function(n,hot){return '<span class="pill '+(n===0?"zero":hot?"hot":"")+'">'+n+'</span>'};
   var openName=rows.length===1&&toks.length?rows[0].n:state.open;
   $("tb").innerHTML=rows.length?rows.map(function(p){
-    var h='<tr class="p" tabindex="0" data-n="'+esc(p.n)+'"><td>'+esc(p.n)+(p.int?' <span class="tag">INT</span>':'')+'<span class="svc">'+esc(p.s)+'</span></td><td>'+p.j+'</td><td>'+sgn(p.ein)+'</td><td>'+sgn(p.eout)+'</td><td>'+dur(p.amp)+'</td><td>'+pill(p.late,p.late/p.j>=0.1)+'</td><td>'+pill(p.early,p.early/p.j>=0.1)+'</td><td>'+(p.lost?dur(p.lost):"—")+'</td><td>'+pill(p.outs,p.outs>0)+'</td><td>'+(p.cost?eur(p.cost):"—")+'</td><td class="act"><button type="button" class="rm" data-rm="'+esc(p.n)+'" aria-label="Retirer '+esc(p.n)+' de l\'analyse" title="Retirer de l\'analyse">×</button></td></tr>';
+    var h='<tr class="p" tabindex="0" data-n="'+esc(p.n)+'"><td>'+esc(p.n)+(p.int?' <span class="tag">INT</span>':'')+'<span class="svc">'+esc(p.s)+'</span></td><td>'+p.j+'</td><td>'+sgn(p.ein)+'</td><td>'+sgn(p.eout)+'</td><td>'+dur(p.amp)+'</td><td>'+pill(p.late,p.late/p.j>=0.1)+'</td><td>'+pill(p.early,p.early/p.j>=0.1)+'</td><td>'+(p.lost?dur(p.lost):"—")+'</td><td>'+pill(p.outs,p.outs>0)+'</td><td>'+(p.cost?eur(p.cost):"—")+'</td><td class="act">'+(CANEX?'<button type="button" class="rm" data-rm="'+esc(p.n)+'" aria-label="Retirer '+esc(p.n)+' de l\'analyse" title="Retirer de l\'analyse">×</button>':'')+'</td></tr>';
     if(openName===p.n){
       h+='<tr class="detail"><td colspan="11"><p class="who">'+esc([p.ct,p.job,p.t?"taux horaire "+eur2(p.t):"taux horaire inconnu",p.cmin?dur(p.cmin)+" d'absence valorisées":""].filter(Boolean).join(" · "))+'</p><h3>Journées hors tolérance</h3>'+(p.flag.length?'<ul>'+p.flag.map(function(d){
         var a=hm(d[7]+d[3]),b=hm(d[8]+d[4]);
@@ -770,7 +773,7 @@ function render(){
   var ex=Object.keys(state.ex).sort(function(a,b){return a.localeCompare(b)});
   $("count").textContent=rows.length+(rows.length!==r.rows.length?" sur "+r.rows.length:"")+" personnes"+(ex.length?" · "+ex.length+" retirée"+(ex.length>1?"s":""):"");
   $("exbar").className=ex.length?"on":"";
-  $("exbar").innerHTML=ex.length?'<strong>Noms retirés, touchez pour rétablir :</strong>'+ex.map(function(n){return '<button type="button" class="chip" data-back="'+esc(n)+'">'+esc(n)+' ↩</button>'}).join("")+(ex.length>1?'<button type="button" class="chip all" data-all="1">Tout rétablir</button>':""):"";
+  $("exbar").innerHTML=!ex.length?"":CANEX?'<strong>Noms retirés, touchez pour rétablir :</strong>'+ex.map(function(n){return '<button type="button" class="chip" data-back="'+esc(n)+'">'+esc(n)+' ↩</button>'}).join("")+(ex.length>1?'<button type="button" class="chip all" data-all="1">Tout rétablir</button>':""):'<strong>Noms retirés de l\'analyse par l\'administrateur :</strong> '+ex.map(esc).join(", ");
   $("notes").innerHTML=[
     "Les heures sont celles du poste de garde, pas du poste de travail : la tolérance couvre le trajet entre les deux. Une valeur négative impose d'être entré avant l'heure, ou sorti après.",
     "Entrée tardive : première entrée du jour après le début du shift plus la tolérance. Sortie anticipée : dernière sortie avant la fin du shift moins la tolérance. L'écart cumulé additionne ces retards et départs, comptés depuis l'heure du shift (ou depuis l'heure exigée si la tolérance est négative).",
@@ -782,8 +785,8 @@ function render(){
     "Horaires de shift : ils se règlent par jour de la semaine dans « Horaires des shifts ». Une case vide signifie pas de shift ce jour-là. Pour la nuit, le jour est celui du début du shift ; une sortie puis un retour après minuit restent rattachés à la même nuit.",
     "Journées écartées pour ces "+c.postes+" personnes : "+c.autre+" hors des shifts paramétrés (journée, heures supplémentaires, demi-journée), "+c.decale+" en horaire décalé de plus de 45 min à l'entrée comme à la sortie, "+c.anom+" avec un badge de sortie manquant ou incohérent.",
     m.dropped?"Le "+dlong(m.dropped)+", en cours au moment de l'export, n'est pas pris en compte.":"",
-    c.filt?"Coût : minutes d'absence × taux horaire × coefficient. Les intérimaires prennent le taux unique saisi dans l'encadré de coût. Le taux horaire est le salaire de base (ou forfaitaire) divisé par l'horaire mensuel moyen de la liste du personnel ; c'est un taux brut, hors primes. Le coefficient ajoute les charges patronales si besoin.":"",
-    "Un nom retiré avec la croix sort de tous les chiffres. Un export ajouté s'additionne aux passages de la page sans doublon ; une nouvelle liste du personnel remplace l'ancienne. Les passages, les états badgeuse, la liste du personnel, les horaires de shift et les noms retirés sont partagés en direct entre tous les comptes connectés. Les filtres et les tolérances restent propres à chaque poste."
+    c.filt?"Coût : minutes d'absence × taux horaire × coefficient. Les intérimaires prennent le taux unique saisi dans l'encadré de coût. Le taux horaire est le salaire de base (ou forfaitaire) divisé par l'horaire mensuel moyen de la liste du personnel ; c'est un taux brut, hors primes. Le coefficient ajoute les charges patronales si besoin. Une sortie de site plus courte que le seuil « non valorisées » reste comptée dans l'alerte mais ne coûte rien ; au-delà, elle est valorisée en entier.":"",
+    "Un nom retiré sort de tous les chiffres, pour tout le monde ; seul l'administrateur peut retirer ou rétablir un nom. Un export ajouté s'additionne aux passages de la page sans doublon ; une nouvelle liste du personnel remplace l'ancienne. Les passages, les états badgeuse, la liste du personnel, les horaires de shift et les noms retirés sont partagés en direct entre tous les comptes connectés. Les filtres et les tolérances restent propres à chaque poste."
   ].filter(Boolean).map(function(x){return "<li>"+x+"</li>"}).join("");
 }
 
@@ -872,7 +875,7 @@ function init(){
   var RST=$("reset")||document.createElement("button");RST.hidden=!at;
   RST.addEventListener("click",function(){try{localStorage.removeItem(DKEY)}catch(e){}RAW=BASE.raw;STAFF=BASE.staff;STAFFAT=0;TS=BASE.ts;RST.hidden=true;["fstatus","tsStatus","staffStatus"].forEach(function(i){$(i).className="fstatus";$(i).textContent=""});$("dataNote").textContent="Données d'origine rétablies.";rebuild()});
   var numIn=function(id,key,lo,hi,def,full){$(id).addEventListener("input",function(e){var v=num(e.target.value);state[key]=v===null?def:Math.max(lo,Math.min(hi,v));if(full)render();else renderTs()})};
-  numIn("gMax","gMax",1,240,60,true);numIn("gMin","gMin",0,60,3,true);numIn("tInt","tInt",0,200,0,true);numIn("tsTol","tsTol",0,60,5,false);
+  numIn("gMax","gMax",1,240,60,true);numIn("gMin","gMin",0,60,3,true);numIn("tInt","tInt",0,200,0,true);numIn("gFree","gFree",0,240,0,true);numIn("tsTol","tsTol",0,60,5,false);
   $("tsCount").addEventListener("change",function(e){state.tsCount=e.target.value;if(state.tsCount!==""&&state.tsType===""){state.tsType="all";$("tsType").value="all"}renderTs()});
   $("tsDate").addEventListener("change",function(e){state.tsDate=e.target.value;renderTs()});
   $("tsType").addEventListener("change",function(e){state.tsType=e.target.value;renderTs()});
@@ -926,9 +929,9 @@ function init(){
   document.querySelector("#tbl thead").addEventListener("click",function(e){var th=e.target.closest("th");if(th&&th.dataset.k)sortBy(th.dataset.k)});
   document.querySelector("#tbl thead").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){var th=e.target.closest("th");if(th&&th.dataset.k){e.preventDefault();sortBy(th.dataset.k)}}});
   var toggle=function(tr){if(!tr)return;var n=tr.dataset.n;state.open=state.open===n?"":n;render()};
-  $("tb").addEventListener("click",function(e){var b=e.target.closest("button.rm");if(b){state.ex[b.dataset.rm]=1;if(state.open===b.dataset.rm)state.open="";saveEx();render();return}toggle(e.target.closest("tr.p"))});
+  $("tb").addEventListener("click",function(e){var b=e.target.closest("button.rm");if(b){if(!CANEX)return;state.ex[b.dataset.rm]=1;if(state.open===b.dataset.rm)state.open="";saveEx();render();return}toggle(e.target.closest("tr.p"))});
   $("tb").addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.target.closest("button"))toggle(e.target.closest("tr.p"))});
-  $("exbar").addEventListener("click",function(e){var b=e.target.closest("button.chip");if(!b)return;if(b.dataset.all)state.ex={};else delete state.ex[b.dataset.back];saveEx();render()});
+  $("exbar").addEventListener("click",function(e){var b=e.target.closest("button.chip");if(!b||!CANEX)return;if(b.dataset.all)state.ex={};else delete state.ex[b.dataset.back];saveEx();render()});
   $("alert").addEventListener("click",function(e){var b=e.target.closest("button.chip");if(!b)return;state.q=b.dataset.who;$("q").value=state.q;state.open=state.q;state.sort="outs";state.dir=-1;render();$("people").scrollIntoView({behavior:"smooth",block:"start"})});
   var pickM=function(tr){if(!tr||!tr.dataset.m)return;state.month=state.month===tr.dataset.m?"":tr.dataset.m;$("month").value=state.month;render()};
   $("mb").addEventListener("click",function(e){pickM(e.target.closest("tr"))});
@@ -959,7 +962,7 @@ function liveMsg(t,cls){var el=$("liveMsg");el.className="livemsg "+(cls||"");el
 function liveErr(e){var m=String(e&&(e.code||e.message)||e);
   liveMsg(/permission/i.test(m)?"Modification refusée : votre compte n'a pas le droit de modifier ces données. L'affichage est revenu à l'état partagé.":"La modification n'a pas pu être enregistrée ("+m+"). Vérifiez la connexion puis recommencez.","err");liveResync()}
 function loadEx(){} function loadShifts(){} function loadData(){return 0}
-function saveEx(){if(LIVE.started&&canWrite())FB.set(R("config/exclus"),{at:Date.now(),json:JSON.stringify(Object.keys(state.ex))}).catch(liveErr)}
+function saveEx(){if(LIVE.started&&LIVE.role==="admin")FB.set(R("config/exclus"),{at:Date.now(),json:JSON.stringify(Object.keys(state.ex))}).catch(liveErr)}
 function saveShifts(at){SHIFTSAT=at;if(!LIVE.started)return;if(!canWrite()){liveErr("permission");return}
   FB.set(R("config/shifts"),at?{at:at,by:LIVE.user.email||"",json:JSON.stringify(SHIFTS)}:null).catch(liveErr)}
 function gatePatch(oldRaw,newRaw){var seen={},i,p={};
@@ -1050,7 +1053,7 @@ function liveBoot(){
     showScreen("loading");
     LIVE.userOff=FB.onValue(R("users/"+u.uid),function(s){var v=s.val();
       if(!v){FB.set(R("users/"+u.uid),{email:u.email||"",role:"attente",taux:false,at:Date.now()}).catch(function(e){showScreen("wait");$("waitMsg").textContent="Votre compte n'a pas pu être enregistré ("+String(e&&(e.code||e.message)||e)+"). Prévenez l'administrateur."});return}
-      var role=v.role,taux=v.taux===true||role==="admin",changed=role!==LIVE.role||taux!==LIVE.taux;LIVE.role=role;LIVE.taux=taux;CANCOST=taux;
+      var role=v.role,taux=v.taux===true||role==="admin",changed=role!==LIVE.role||taux!==LIVE.taux;LIVE.role=role;LIVE.taux=taux;CANCOST=taux;CANEX=role==="admin";
       if(!isMember()){stopData();showScreen("wait");$("waitMsg").textContent="Compte "+(u.email||"")+" créé. Un administrateur doit maintenant vous donner un accès ; cette page s'ouvrira d'elle-même dès que ce sera fait.";return}
       ["setup","login","wait"].forEach(function(x){$(x).hidden=true});
       if(changed||!LIVE.started)startData()},
