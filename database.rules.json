@@ -1,0 +1,39 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin' || (auth != null && auth.uid === $uid && !data.exists() && newData.child('role').val() === 'attente' && newData.child('taux').val() === false)",
+        "role": {
+          ".validate": "newData.val() === 'admin' || newData.val() === 'integrateur' || newData.val() === 'lecteur' || newData.val() === 'attente'"
+        },
+        "taux": {
+          ".validate": "newData.isBoolean()"
+        }
+      }
+    },
+    "gate": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'integrateur' || root.child('users').child(auth.uid).child('role').val() === 'lecteur')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'integrateur')"
+    },
+    "ts": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'integrateur' || root.child('users').child(auth.uid).child('role').val() === 'lecteur')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'integrateur')"
+    },
+    "staff": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'integrateur' || root.child('users').child(auth.uid).child('role').val() === 'lecteur')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || (root.child('users').child(auth.uid).child('role').val() === 'integrateur' && root.child('users').child(auth.uid).child('taux').val() === true))"
+    },
+    "rates": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || ((root.child('users').child(auth.uid).child('role').val() === 'integrateur' || root.child('users').child(auth.uid).child('role').val() === 'lecteur') && root.child('users').child(auth.uid).child('taux').val() === true))",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || (root.child('users').child(auth.uid).child('role').val() === 'integrateur' && root.child('users').child(auth.uid).child('taux').val() === true))"
+    },
+    "config": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'integrateur' || root.child('users').child(auth.uid).child('role').val() === 'lecteur')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'integrateur')"
+    }
+  }
+}
